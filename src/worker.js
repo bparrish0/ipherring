@@ -146,6 +146,8 @@ async function generateDailyImage(env, randomize = false) {
   formData.append('n', '1');
   formData.append('size', '1024x1024');
   formData.append('quality', 'low');
+  formData.append('output_format', 'webp');
+  formData.append('output_compression', '80');
 
   const response = await fetch('https://api.openai.com/v1/images/edits', {
     method: 'POST',
@@ -174,13 +176,13 @@ async function generateDailyImage(env, randomize = false) {
     holiday: config.holidayName || '',
   };
 
-  await env.BUCKET.put('daily.png', imageBytes, {
-    httpMetadata: { contentType: 'image/png' },
+  await env.BUCKET.put('daily.webp', imageBytes, {
+    httpMetadata: { contentType: 'image/webp' },
     customMetadata: metadata,
   });
 
-  await env.BUCKET.put(`archive/${dateStr}.png`, imageBytes, {
-    httpMetadata: { contentType: 'image/png' },
+  await env.BUCKET.put(`archive/${dateStr}.webp`, imageBytes, {
+    httpMetadata: { contentType: 'image/webp' },
     customMetadata: metadata,
   });
 
@@ -211,7 +213,7 @@ const HTML = `<!DOCTYPE html>
 </style>
 </head>
 <body>
-<img src="/daily.png" alt="IP Herring">
+<img src="/daily.webp" alt="IP Herring">
 <center>
         <h2>%%IP%%</h2>
     </center>
@@ -222,14 +224,14 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    if (url.pathname === '/daily.png') {
-      const obj = await env.BUCKET.get('daily.png');
+    if (url.pathname === '/daily.webp') {
+      const obj = await env.BUCKET.get('daily.webp');
       if (!obj) {
         return new Response('No image generated yet', { status: 404 });
       }
       return new Response(obj.body, {
         headers: {
-          'Content-Type': obj.httpMetadata?.contentType || 'image/png',
+          'Content-Type': obj.httpMetadata?.contentType || 'image/webp',
           'Cache-Control': 'no-cache',
         },
       });
