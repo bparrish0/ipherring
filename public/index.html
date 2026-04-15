@@ -28,10 +28,10 @@
 </center>
 <script>
 const images = [
-  '/andy-random/99d84276-1907-4f2c-b8f9-d0d3cbdec80d.png',
-  '/andy-random/2124b1d8-1a0a-4c67-9257-45b745f759b2.png',
-  '/andy-random/bc79b2f9-3395-4ba2-b7d5-e6ba547a71b9.png',
-  '/andy-random/c676298f-b92c-4fd2-82e8-0780f91976ea.png',
+  '/andy-random/99d84276-1907-4f2c-b8f9-d0d3cbdec80d.webp',
+  '/andy-random/2124b1d8-1a0a-4c67-9257-45b745f759b2.webp',
+  '/andy-random/bc79b2f9-3395-4ba2-b7d5-e6ba547a71b9.webp',
+  '/andy-random/c676298f-b92c-4fd2-82e8-0780f91976ea.webp',
 ];
 document.getElementById('herring').src = images[Math.floor(Math.random() * images.length)];
 fetch('/cdn-cgi/trace').then(r => r.text()).then(t => {
