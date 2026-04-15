@@ -34,7 +34,10 @@ const images = [
   '/andy-random/c676298f-b92c-4fd2-82e8-0780f91976ea.png',
 ];
 document.getElementById('herring').src = images[Math.floor(Math.random() * images.length)];
-fetch('/api/ip').then(r => r.text()).then(ip => document.getElementById('ip').textContent = ip);
+fetch('/cdn-cgi/trace').then(r => r.text()).then(t => {
+  const ip = t.match(/ip=(.+)/);
+  if (ip) document.getElementById('ip').textContent = ip[1];
+});
 </script>
 </body>
 </html>
