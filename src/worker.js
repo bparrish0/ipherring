@@ -108,9 +108,23 @@ function buildPrompt(scene, style, holidayName) {
   return prompt;
 }
 
-async function generateDailyImage(env) {
+function getRandomConfig() {
+  const sourceIndex = Math.floor(Math.random() * SOURCE_IMAGES.length);
+  const scene = SCENES[Math.floor(Math.random() * SCENES.length)];
+  const style = STYLES[Math.floor(Math.random() * STYLES.length)];
   const now = new Date();
-  const config = getDailyConfig(now);
+  const holiday = getHolidayScene(now.getMonth() + 1, now.getDate());
+  return {
+    sourceIndex,
+    scene: holiday ? holiday.scene : scene,
+    style,
+    holidayName: holiday ? holiday.name : null,
+  };
+}
+
+async function generateDailyImage(env, randomize = false) {
+  const now = new Date();
+  const config = randomize ? getRandomConfig() : getDailyConfig(now);
   const sourceKey = SOURCE_IMAGES[config.sourceIndex];
 
   const sourceObj = await env.BUCKET.get(sourceKey);
@@ -226,7 +240,7 @@ export default {
       if (auth !== `Bearer ${env.OPENAI_API_KEY}`) {
         return new Response('Unauthorized', { status: 401 });
       }
-      await generateDailyImage(env);
+      await generateDailyImage(env, true);
       return new Response('Generated');
     }
 
