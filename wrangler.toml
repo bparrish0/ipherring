@@ -1,0 +1,10 @@
+name = "ipherring"
+main = "src/worker.js"
+compatibility_date = "2024-01-01"
+
+[triggers]
+crons = ["0 6 * * *"]
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "ipherring"
