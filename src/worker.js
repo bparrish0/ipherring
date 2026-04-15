@@ -230,7 +230,7 @@ export default {
       return new Response(obj.body, {
         headers: {
           'Content-Type': obj.httpMetadata?.contentType || 'image/png',
-          'Cache-Control': 'public, max-age=3600',
+          'Cache-Control': 'no-cache',
         },
       });
     }
