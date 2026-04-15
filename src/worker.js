@@ -192,7 +192,7 @@ const HTML = `<!DOCTYPE html>
 \t\tcolor:#404040;
 \t}
 \timg{
-        width: 25%;
+        width: 40%;
     }
 </style>
 </head>
