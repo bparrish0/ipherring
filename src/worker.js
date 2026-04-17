@@ -4,6 +4,7 @@ const SOURCE_IMAGES = [
   { key: 'source/3.jpg', people: 1 },
   { key: 'source/4.jpeg', people: 2 },
   { key: 'source/5.jpeg', people: 1 },
+  { key: 'source/6.jpeg', people: 1, subject: 'evan' },
 ];
 
 const SCENES = [
@@ -111,23 +112,29 @@ function getRandomConfig() {
   };
 }
 
-function buildPrompt(scene, style, holidayName, people) {
-  const subject = people > 1 ? `${people} men` : 'a man';
-  const pronoun = people > 1 ? 'them' : 'him';
-  const possessive = people > 1 ? 'their' : 'his';
-  const faces = people > 1 ? 'their faces are' : 'his face is';
+function buildPrompt(scene, style, holidayName, source) {
+  let intro;
+  if (source.people === 2) {
+    intro =
+      "This photo shows two men: Andy on the RIGHT (heavier build, light blue button-up shirt, khaki pants) " +
+      "and Evan on the LEFT (lighter build, maroon/brown zip jacket, red beard, glasses).";
+  } else if (source.subject === 'evan') {
+    intro = 'This photo shows Evan, a man with a red beard, glasses, and a maroon zip jacket.';
+  } else {
+    intro = 'This photo shows a man named Andy.';
+  }
 
-  let prompt = `This photo contains ${subject}. Extract ONLY the ${people > 1 ? 'people' : 'man'} (${possessive} ${people > 1 ? 'faces, bodies, and clothing' : 'face, body, and clothing'}) from this photo. `;
+  let prompt = `${intro} Extract the people/person from this photo preserving their faces, beards, glasses, hair, build, and clothing. `;
   prompt += `Do NOT keep any of the original background, surroundings, or setting. `;
-  prompt += `Place ${pronoun} into this completely new scene: ${scene}. `;
-  if (people > 1) {
-    prompt += `Keep all ${people} people together in the new scene. `;
+  prompt += `Place them into this completely new scene: ${scene}. `;
+  if (source.people === 2) {
+    prompt += `If the scene mentions only one of them by name, include only that person. If it mentions both or neither, include both Andy and Evan together. `;
   }
   if (holidayName) {
     prompt += `Today is ${holidayName}, so make the scene festive and themed for the holiday. `;
   }
   prompt += `Render the final image in this artistic style: ${style}. `;
-  prompt += `The result should be funny, absurd, and visually striking. Make sure ${faces} clearly recognizable.`;
+  prompt += `The result should be funny, absurd, and visually striking. Make sure the face(s) are clearly recognizable.`;
   return prompt;
 }
 
@@ -141,7 +148,7 @@ async function generateImage(env, config) {
   const sourceBytes = await sourceObj.arrayBuffer();
   const sourceBlob = new Blob([sourceBytes], { type: sourceObj.httpMetadata?.contentType || 'image/png' });
 
-  const prompt = buildPrompt(config.scene, config.style, config.holidayName, source.people);
+  const prompt = buildPrompt(config.scene, config.style, config.holidayName, source);
   console.log(`Generating - Source: ${source.key} (${source.people} people), Scene: "${config.scene}", Style: "${config.style}"`);
 
   const formData = new FormData();
@@ -217,15 +224,40 @@ async function getCustomCount(env) {
   return val ? parseInt(val, 10) : 0;
 }
 
-async function incrementCustomCount(env) {
+async function adjustCustomCount(env, delta) {
   const key = getCounterKey();
   const current = await getCustomCount(env);
-  await env.RATE_LIMIT.put(key, String(current + 1), { expirationTtl: 172800 });
-  return current + 1;
+  const next = current + delta;
+  await env.RATE_LIMIT.put(key, String(next), { expirationTtl: 172800 });
+  return next;
+}
+
+function pickSourceForPrompt(userPrompt) {
+  const mentionsEvan = /\bevan\b/i.test(userPrompt);
+  const mentionsAndy = /\bandy\b/i.test(userPrompt);
+
+  if (mentionsEvan && mentionsAndy) {
+    const idx = SOURCE_IMAGES.findIndex((s) => s.people === 2);
+    if (idx >= 0) return idx;
+  }
+  if (mentionsEvan) {
+    const idx = SOURCE_IMAGES.findIndex((s) => s.subject === 'evan');
+    if (idx >= 0) return idx;
+  }
+  if (mentionsAndy) {
+    const andyIndices = SOURCE_IMAGES
+      .map((s, i) => ({ s, i }))
+      .filter(({ s }) => s.people === 1 && s.subject !== 'evan')
+      .map(({ i }) => i);
+    if (andyIndices.length) {
+      return andyIndices[Math.floor(Math.random() * andyIndices.length)];
+    }
+  }
+  return Math.floor(Math.random() * SOURCE_IMAGES.length);
 }
 
 async function generateCustom(env, userPrompt) {
-  const sourceIndex = Math.floor(Math.random() * SOURCE_IMAGES.length);
+  const sourceIndex = pickSourceForPrompt(userPrompt);
   const style = STYLES[Math.floor(Math.random() * STYLES.length)];
   const config = {
     sourceIndex,
@@ -465,7 +497,7 @@ export default {
         return Response.json({ error: 'Daily custom limit reached. Try again tomorrow.' }, { status: 429 });
       }
 
-      await incrementCustomCount(env);
+      await adjustCustomCount(env, 1);
 
       try {
         await generateCustom(env, userPrompt);
@@ -473,6 +505,7 @@ export default {
       } catch (err) {
         console.error(err);
         if (err.moderation) {
+          await adjustCustomCount(env, -1);
           return Response.json({ error: 'Nobody wants to see that!' }, { status: 400 });
         }
         return Response.json({ error: 'Image generation failed. Try again.' }, { status: 500 });
