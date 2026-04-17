@@ -375,7 +375,7 @@ const HTML = `<!DOCTYPE html>
 </center>
 <div id="modal" role="dialog" aria-modal="true">
 \t<div class="modal-box">
-\t\t<h3>What would you like Andy to do today?</h3>
+\t\t<h3>What would you like Andy, Evan, or both, to do today?</h3>
 \t\t<textarea id="userPrompt" placeholder="e.g. riding a unicycle through a hurricane" maxlength="500"></textarea>
 \t\t<div id="status"></div>
 \t\t<div class="modal-buttons">
@@ -454,7 +454,7 @@ const HTML = `<!DOCTYPE html>
 \tcancel.addEventListener('click', closeModal);
 \tsubmit.addEventListener('click', submitPrompt);
 \tpromptBox.addEventListener('keydown', function(e){
-\t\tif ((e.ctrlKey || e.metaKey) && e.key === 'Enter') submitPrompt();
+\t\tif (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitPrompt(); }
 \t\tif (e.key === 'Escape') closeModal();
 \t});
 \tmodal.addEventListener('click', function(e){ if (e.target === modal) closeModal(); });
