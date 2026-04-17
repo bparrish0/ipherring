@@ -8,3 +8,7 @@ crons = ["0 6 * * *"]
 [[r2_buckets]]
 binding = "BUCKET"
 bucket_name = "ipherring"
+
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "82c8e9d551144a4aba29bdf06123ae87"

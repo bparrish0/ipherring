@@ -1,7 +1,9 @@
 const SOURCE_IMAGES = [
-  'source/1.png',
-  'source/2.jpg',
-  'source/3.jpg',
+  { key: 'source/1.png', people: 1 },
+  { key: 'source/2.jpg', people: 1 },
+  { key: 'source/3.jpg', people: 1 },
+  { key: 'source/4.jpeg', people: 2 },
+  { key: 'source/5.jpeg', people: 1 },
 ];
 
 const SCENES = [
@@ -86,26 +88,13 @@ function getDailyConfig(date) {
   const sourceIndex = dayOfYear % SOURCE_IMAGES.length;
   const sceneIndex = dayOfYear % SCENES.length;
   const styleIndex = dayOfYear % STYLES.length;
-
   const holiday = getHolidayScene(date.getMonth() + 1, date.getDate());
-
-  const scene = holiday ? holiday.scene : SCENES[sceneIndex];
-  const style = STYLES[styleIndex];
-  const holidayName = holiday ? holiday.name : null;
-
-  return { sourceIndex, scene, style, holidayName };
-}
-
-function buildPrompt(scene, style, holidayName) {
-  let prompt = `This photo contains a man. Extract ONLY the man (his face, body, and clothing) from this photo. `;
-  prompt += `Do NOT keep any of the original background, surroundings, or setting. `;
-  prompt += `Place him into this completely new scene: ${scene}. `;
-  if (holidayName) {
-    prompt += `Today is ${holidayName}, so make the scene festive and themed for the holiday. `;
-  }
-  prompt += `Render the final image in this artistic style: ${style}. `;
-  prompt += `The result should be funny, absurd, and visually striking. Make sure his face is clearly recognizable.`;
-  return prompt;
+  return {
+    sourceIndex,
+    scene: holiday ? holiday.scene : SCENES[sceneIndex],
+    style: STYLES[styleIndex],
+    holidayName: holiday ? holiday.name : null,
+  };
 }
 
 function getRandomConfig() {
@@ -122,22 +111,38 @@ function getRandomConfig() {
   };
 }
 
-async function generateDailyImage(env, randomize = false) {
-  const now = new Date();
-  const config = randomize ? getRandomConfig() : getDailyConfig(now);
-  const sourceKey = SOURCE_IMAGES[config.sourceIndex];
+function buildPrompt(scene, style, holidayName, people) {
+  const subject = people > 1 ? `${people} men` : 'a man';
+  const pronoun = people > 1 ? 'them' : 'him';
+  const possessive = people > 1 ? 'their' : 'his';
+  const faces = people > 1 ? 'their faces are' : 'his face is';
 
-  const sourceObj = await env.BUCKET.get(sourceKey);
+  let prompt = `This photo contains ${subject}. Extract ONLY the ${people > 1 ? 'people' : 'man'} (${possessive} ${people > 1 ? 'faces, bodies, and clothing' : 'face, body, and clothing'}) from this photo. `;
+  prompt += `Do NOT keep any of the original background, surroundings, or setting. `;
+  prompt += `Place ${pronoun} into this completely new scene: ${scene}. `;
+  if (people > 1) {
+    prompt += `Keep all ${people} people together in the new scene. `;
+  }
+  if (holidayName) {
+    prompt += `Today is ${holidayName}, so make the scene festive and themed for the holiday. `;
+  }
+  prompt += `Render the final image in this artistic style: ${style}. `;
+  prompt += `The result should be funny, absurd, and visually striking. Make sure ${faces} clearly recognizable.`;
+  return prompt;
+}
+
+async function generateImage(env, config) {
+  const source = SOURCE_IMAGES[config.sourceIndex];
+  const sourceObj = await env.BUCKET.get(source.key);
   if (!sourceObj) {
-    console.error(`Source image not found in R2: ${sourceKey}`);
-    return;
+    throw new Error(`Source image not found in R2: ${source.key}`);
   }
 
   const sourceBytes = await sourceObj.arrayBuffer();
   const sourceBlob = new Blob([sourceBytes], { type: sourceObj.httpMetadata?.contentType || 'image/png' });
 
-  const prompt = buildPrompt(config.scene, config.style, config.holidayName);
-  console.log(`Generating image - Source: ${sourceKey}, Scene: "${config.scene}", Style: "${config.style}"`);
+  const prompt = buildPrompt(config.scene, config.style, config.holidayName, source.people);
+  console.log(`Generating - Source: ${source.key} (${source.people} people), Scene: "${config.scene}", Style: "${config.style}"`);
 
   const formData = new FormData();
   formData.append('model', 'gpt-image-1');
@@ -151,28 +156,26 @@ async function generateDailyImage(env, randomize = false) {
 
   const response = await fetch('https://api.openai.com/v1/images/edits', {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${env.OPENAI_API_KEY}`,
-    },
+    headers: { 'Authorization': `Bearer ${env.OPENAI_API_KEY}` },
     body: formData,
   });
 
   if (!response.ok) {
     const error = await response.text();
-    console.error(`OpenAI API error: ${response.status} ${error}`);
-    return;
+    throw new Error(`OpenAI API error: ${response.status} ${error}`);
   }
 
   const result = await response.json();
   const b64 = result.data[0].b64_json;
   const imageBytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
 
+  const now = new Date();
   const dateStr = now.toISOString().split('T')[0];
   const metadata = {
     date: dateStr,
-    scene: config.scene,
+    scene: config.scene.substring(0, 1024),
     style: config.style,
-    source: sourceKey,
+    source: source.key,
     holiday: config.holidayName || '',
   };
 
@@ -181,12 +184,48 @@ async function generateDailyImage(env, randomize = false) {
     customMetadata: metadata,
   });
 
-  await env.BUCKET.put(`archive/${dateStr}.webp`, imageBytes, {
+  const archiveKey = `archive/${dateStr}-${now.getTime()}.webp`;
+  await env.BUCKET.put(archiveKey, imageBytes, {
     httpMetadata: { contentType: 'image/webp' },
     customMetadata: metadata,
   });
 
-  console.log(`Generated and stored daily image for ${dateStr}`);
+  console.log(`Stored daily image for ${dateStr}`);
+}
+
+async function generateDailyImage(env, randomize = false) {
+  const config = randomize ? getRandomConfig() : getDailyConfig(new Date());
+  await generateImage(env, config);
+}
+
+const DAILY_CUSTOM_LIMIT = 2;
+
+function getCounterKey() {
+  return `custom:${new Date().toISOString().split('T')[0]}`;
+}
+
+async function getCustomCount(env) {
+  const val = await env.RATE_LIMIT.get(getCounterKey());
+  return val ? parseInt(val, 10) : 0;
+}
+
+async function incrementCustomCount(env) {
+  const key = getCounterKey();
+  const current = await getCustomCount(env);
+  await env.RATE_LIMIT.put(key, String(current + 1), { expirationTtl: 172800 });
+  return current + 1;
+}
+
+async function generateCustom(env, userPrompt) {
+  const sourceIndex = Math.floor(Math.random() * SOURCE_IMAGES.length);
+  const style = STYLES[Math.floor(Math.random() * STYLES.length)];
+  const config = {
+    sourceIndex,
+    scene: userPrompt,
+    style,
+    holidayName: null,
+  };
+  await generateImage(env, config);
 }
 
 const HTML = `<!DOCTYPE html>
@@ -207,16 +246,179 @@ const HTML = `<!DOCTYPE html>
 \th1{
 \t\tcolor:#404040;
 \t}
-\timg{
-        width: 40%;
-    }
+\t#herring{
+\t\twidth: 40%;
+\t\tcursor: pointer;
+\t\ttransition: opacity 0.2s;
+\t}
+\t#herring:hover{
+\t\topacity: 0.85;
+\t}
+\t#modal{
+\t\tdisplay: none;
+\t\tposition: fixed;
+\t\ttop: 0; left: 0; right: 0; bottom: 0;
+\t\tbackground: rgba(0,0,0,0.6);
+\t\tz-index: 10;
+\t\talign-items: center;
+\t\tjustify-content: center;
+\t}
+\t#modal.open{ display: flex; }
+\t.modal-box{
+\t\tbackground: #fff;
+\t\tborder-radius: 8px;
+\t\tpadding: 24px;
+\t\twidth: 90%;
+\t\tmax-width: 480px;
+\t\tbox-shadow: 0 10px 40px rgba(0,0,0,0.3);
+\t\ttext-align: left;
+\t}
+\t.modal-box h3{ margin: 0 0 12px 0; color: #202020; }
+\t.modal-box textarea{
+\t\twidth: 100%;
+\t\tmin-height: 80px;
+\t\tbox-sizing: border-box;
+\t\tpadding: 10px;
+\t\tfont-family: inherit;
+\t\tfont-size: 14px;
+\t\tborder: 1px solid #ccc;
+\t\tborder-radius: 4px;
+\t\tresize: vertical;
+\t}
+\t.modal-buttons{
+\t\tmargin-top: 12px;
+\t\tdisplay: flex;
+\t\tgap: 8px;
+\t\tjustify-content: flex-end;
+\t}
+\t.modal-buttons button{
+\t\tpadding: 8px 16px;
+\t\tfont-size: 14px;
+\t\tborder-radius: 4px;
+\t\tcursor: pointer;
+\t\tborder: 1px solid #ccc;
+\t\tbackground: #fff;
+\t}
+\t.modal-buttons button.primary{
+\t\tbackground: #2563eb;
+\t\tcolor: #fff;
+\t\tborder-color: #2563eb;
+\t}
+\t.modal-buttons button:disabled{ opacity: 0.5; cursor: not-allowed; }
+\t#status{
+\t\tmargin-top: 12px;
+\t\tfont-size: 14px;
+\t\tcolor: #606060;
+\t\tmin-height: 20px;
+\t}
+\t#status.error{ color: #b91c1c; }
+\t.spinner{
+\t\tdisplay: inline-block;
+\t\twidth: 14px;
+\t\theight: 14px;
+\t\tborder: 2px solid #ccc;
+\t\tborder-top-color: #2563eb;
+\t\tborder-radius: 50%;
+\t\tanimation: spin 0.8s linear infinite;
+\t\tvertical-align: middle;
+\t\tmargin-right: 6px;
+\t}
+\t@keyframes spin { to { transform: rotate(360deg); } }
+\t.remaining{ font-size: 12px; color: #888; margin-top: 6px; }
 </style>
 </head>
 <body>
-<img src="/daily.webp" alt="IP Herring">
+<img id="herring" src="/daily.webp?t=%%TS%%" alt="IP Herring" title="Click to request a custom image">
 <center>
-        <h2>%%IP%%</h2>
-    </center>
+\t<h2>%%IP%%</h2>
+</center>
+<div id="modal" role="dialog" aria-modal="true">
+\t<div class="modal-box">
+\t\t<h3>What would you like Andy to do today?</h3>
+\t\t<textarea id="userPrompt" placeholder="e.g. riding a unicycle through a hurricane" maxlength="500"></textarea>
+\t\t<div id="status"></div>
+\t\t<div class="modal-buttons">
+\t\t\t<button id="cancelBtn" type="button">Cancel</button>
+\t\t\t<button id="submitBtn" type="button" class="primary">Generate</button>
+\t\t</div>
+\t\t<div class="remaining" id="remaining"></div>
+\t</div>
+</div>
+<script>
+(function(){
+\tvar modal = document.getElementById('modal');
+\tvar img = document.getElementById('herring');
+\tvar submit = document.getElementById('submitBtn');
+\tvar cancel = document.getElementById('cancelBtn');
+\tvar promptBox = document.getElementById('userPrompt');
+\tvar status = document.getElementById('status');
+\tvar remaining = document.getElementById('remaining');
+
+\tfunction refreshRemaining(){
+\t\tfetch('/custom/status').then(function(r){ return r.json(); }).then(function(d){
+\t\t\tremaining.textContent = d.remaining + ' custom request' + (d.remaining === 1 ? '' : 's') + ' left today';
+\t\t\tsubmit.disabled = d.remaining <= 0;
+\t\t\tif (d.remaining <= 0) {
+\t\t\t\tstatus.textContent = 'Daily custom limit reached. Try again tomorrow.';
+\t\t\t}
+\t\t}).catch(function(){});
+\t}
+
+\tfunction openModal(){
+\t\tstatus.textContent = '';
+\t\tstatus.className = '';
+\t\tpromptBox.value = '';
+\t\tsubmit.disabled = false;
+\t\tmodal.classList.add('open');
+\t\tpromptBox.focus();
+\t\trefreshRemaining();
+\t}
+
+\tfunction closeModal(){
+\t\tmodal.classList.remove('open');
+\t}
+
+\tfunction submitPrompt(){
+\t\tvar text = promptBox.value.trim();
+\t\tif (!text) { promptBox.focus(); return; }
+\t\tsubmit.disabled = true;
+\t\tcancel.disabled = true;
+\t\tstatus.className = '';
+\t\tstatus.innerHTML = '<span class="spinner"></span>Generating... this may take up to a minute';
+\t\tfetch('/custom', {
+\t\t\tmethod: 'POST',
+\t\t\theaders: { 'Content-Type': 'application/json' },
+\t\t\tbody: JSON.stringify({ prompt: text })
+\t\t}).then(function(r){
+\t\t\treturn r.json().then(function(d){ return { ok: r.ok, status: r.status, body: d }; });
+\t\t}).then(function(res){
+\t\t\tif (res.ok) {
+\t\t\t\tstatus.textContent = 'Done! Reloading...';
+\t\t\t\tsetTimeout(function(){ window.location.href = window.location.pathname + '?t=' + Date.now(); }, 500);
+\t\t\t} else {
+\t\t\t\tstatus.className = 'error';
+\t\t\t\tstatus.textContent = res.body.error || 'Something went wrong';
+\t\t\t\tsubmit.disabled = false;
+\t\t\t\tcancel.disabled = false;
+\t\t\t}
+\t\t}).catch(function(err){
+\t\t\tstatus.className = 'error';
+\t\t\tstatus.textContent = 'Network error: ' + err.message;
+\t\t\tsubmit.disabled = false;
+\t\t\tcancel.disabled = false;
+\t\t});
+\t}
+
+\timg.addEventListener('click', openModal);
+\tcancel.addEventListener('click', closeModal);
+\tsubmit.addEventListener('click', submitPrompt);
+\tpromptBox.addEventListener('keydown', function(e){
+\t\tif ((e.ctrlKey || e.metaKey) && e.key === 'Enter') submitPrompt();
+\t\tif (e.key === 'Escape') closeModal();
+\t});
+\tmodal.addEventListener('click', function(e){ if (e.target === modal) closeModal(); });
+})();
+</script>
 </body>
 </html>`;
 
@@ -226,15 +428,44 @@ export default {
 
     if (url.pathname === '/daily.webp') {
       const obj = await env.BUCKET.get('daily.webp');
-      if (!obj) {
-        return new Response('No image generated yet', { status: 404 });
-      }
+      if (!obj) return new Response('No image generated yet', { status: 404 });
       return new Response(obj.body, {
         headers: {
           'Content-Type': obj.httpMetadata?.contentType || 'image/webp',
           'Cache-Control': 'no-cache',
         },
       });
+    }
+
+    if (url.pathname === '/custom/status') {
+      const count = await getCustomCount(env);
+      return Response.json({
+        remaining: Math.max(0, DAILY_CUSTOM_LIMIT - count),
+        limit: DAILY_CUSTOM_LIMIT,
+      });
+    }
+
+    if (url.pathname === '/custom' && request.method === 'POST') {
+      let body;
+      try { body = await request.json(); } catch { return Response.json({ error: 'Invalid JSON' }, { status: 400 }); }
+      const userPrompt = (body.prompt || '').toString().trim();
+      if (!userPrompt) return Response.json({ error: 'Prompt required' }, { status: 400 });
+      if (userPrompt.length > 500) return Response.json({ error: 'Prompt too long (max 500 chars)' }, { status: 400 });
+
+      const count = await getCustomCount(env);
+      if (count >= DAILY_CUSTOM_LIMIT) {
+        return Response.json({ error: 'Daily custom limit reached. Try again tomorrow.' }, { status: 429 });
+      }
+
+      await incrementCustomCount(env);
+
+      try {
+        await generateCustom(env, userPrompt);
+        return Response.json({ ok: true });
+      } catch (err) {
+        console.error(err);
+        return Response.json({ error: 'Image generation failed: ' + err.message }, { status: 500 });
+      }
     }
 
     if (url.pathname === '/generate' && request.method === 'POST') {
@@ -247,7 +478,7 @@ export default {
     }
 
     const ip = request.headers.get('CF-Connecting-IP') || 'Unknown';
-    const html = HTML.replace('%%IP%%', ip);
+    const html = HTML.replace('%%IP%%', ip).replace('%%TS%%', Date.now().toString());
     return new Response(html, {
       headers: { 'Content-Type': 'text/html;charset=utf-8' },
     });
