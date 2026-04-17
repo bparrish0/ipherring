@@ -235,8 +235,9 @@ async function adjustCustomCount(env, delta) {
 function pickSourceForPrompt(userPrompt) {
   const mentionsEvan = /\bevan\b/i.test(userPrompt);
   const mentionsAndy = /\bandy\b/i.test(userPrompt);
+  const mentionsBoth = /\b(both|together|duo|the pair|the guys|the two guys|the two of them)\b/i.test(userPrompt);
 
-  if (mentionsEvan && mentionsAndy) {
+  if ((mentionsEvan && mentionsAndy) || mentionsBoth) {
     const idx = SOURCE_IMAGES.findIndex((s) => s.people === 2);
     if (idx >= 0) return idx;
   }
