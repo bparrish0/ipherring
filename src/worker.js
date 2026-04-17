@@ -156,7 +156,7 @@ async function generateImage(env, config) {
   formData.append('image[]', sourceBlob, 'source.png');
   formData.append('prompt', prompt);
   formData.append('n', '1');
-  formData.append('size', '1536x1024');
+  formData.append('size', '1024x1024');
   formData.append('quality', 'high');
   formData.append('input_fidelity', 'high');
   formData.append('output_format', 'webp');
