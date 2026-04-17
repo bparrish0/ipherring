@@ -245,14 +245,12 @@ function pickSourceForPrompt(userPrompt) {
     const idx = SOURCE_IMAGES.findIndex((s) => s.subject === 'evan');
     if (idx >= 0) return idx;
   }
-  if (mentionsAndy) {
-    const andyIndices = SOURCE_IMAGES
-      .map((s, i) => ({ s, i }))
-      .filter(({ s }) => s.people === 1 && s.subject !== 'evan')
-      .map(({ i }) => i);
-    if (andyIndices.length) {
-      return andyIndices[Math.floor(Math.random() * andyIndices.length)];
-    }
+  const andyIndices = SOURCE_IMAGES
+    .map((s, i) => ({ s, i }))
+    .filter(({ s }) => s.people === 1 && s.subject !== 'evan')
+    .map(({ i }) => i);
+  if (andyIndices.length) {
+    return andyIndices[Math.floor(Math.random() * andyIndices.length)];
   }
   return Math.floor(Math.random() * SOURCE_IMAGES.length);
 }
