@@ -161,8 +161,16 @@ async function generateImage(env, config) {
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`OpenAI API error: ${response.status} ${error}`);
+    const errorText = await response.text();
+    let parsed;
+    try { parsed = JSON.parse(errorText); } catch {}
+    const code = parsed?.error?.code;
+    if (code === 'moderation_blocked') {
+      const err = new Error('Nobody wants to see that!');
+      err.moderation = true;
+      throw err;
+    }
+    throw new Error(`OpenAI API error: ${response.status} ${errorText}`);
   }
 
   const result = await response.json();
@@ -464,7 +472,10 @@ export default {
         return Response.json({ ok: true });
       } catch (err) {
         console.error(err);
-        return Response.json({ error: 'Image generation failed: ' + err.message }, { status: 500 });
+        if (err.moderation) {
+          return Response.json({ error: 'Nobody wants to see that!' }, { status: 400 });
+        }
+        return Response.json({ error: 'Image generation failed. Try again.' }, { status: 500 });
       }
     }
 
