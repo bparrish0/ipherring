@@ -148,8 +148,8 @@ async function generateImage(env, config) {
   const sourceBytes = await sourceObj.arrayBuffer();
   const sourceBlob = new Blob([sourceBytes], { type: sourceObj.httpMetadata?.contentType || 'image/png' });
 
-  const prompt = buildPrompt(config.scene, config.style, config.holidayName, source);
-  console.log(`Generating - Source: ${source.key} (${source.people} people), Scene: "${config.scene}", Style: "${config.style}"`);
+  const prompt = config.rawPrompt ?? buildPrompt(config.scene, config.style, config.holidayName, source);
+  console.log(`Generating - Source: ${source.key} (${source.people} people), Prompt: "${prompt.substring(0, 200)}"`);
 
   const formData = new FormData();
   formData.append('model', 'gpt-image-1');
@@ -188,8 +188,8 @@ async function generateImage(env, config) {
   const dateStr = now.toISOString().split('T')[0];
   const metadata = {
     date: dateStr,
-    scene: config.scene.substring(0, 1024),
-    style: config.style,
+    scene: (config.scene || config.rawPrompt || '').substring(0, 1024),
+    style: config.style || '',
     source: source.key,
     holiday: config.holidayName || '',
   };
@@ -259,14 +259,7 @@ function pickSourceForPrompt(userPrompt) {
 
 async function generateCustom(env, userPrompt) {
   const sourceIndex = pickSourceForPrompt(userPrompt);
-  const style = STYLES[Math.floor(Math.random() * STYLES.length)];
-  const config = {
-    sourceIndex,
-    scene: userPrompt,
-    style,
-    holidayName: null,
-  };
-  await generateImage(env, config);
+  await generateImage(env, { sourceIndex, rawPrompt: userPrompt });
 }
 
 const HTML = `<!DOCTYPE html>
