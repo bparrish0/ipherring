@@ -345,6 +345,9 @@ const HTML = `<!DOCTYPE html>
 \t\tmin-height: 20px;
 \t}
 \t#status.error{ color: #b91c1c; }
+\t#ip-box{ margin: 4px 0 24px; }
+\t#ipv4{ font-size: 1.5em; font-weight: 500; color: #404040; margin: 0; }
+\t#ipv6{ font-size: 0.95em; color: #808080; margin: 4px 0 0; font-family: ui-monospace, Menlo, Consolas, monospace; min-height: 1em; }
 \t.spinner{
 \t\tdisplay: inline-block;
 \t\twidth: 14px;
@@ -362,9 +365,10 @@ const HTML = `<!DOCTYPE html>
 </head>
 <body>
 <img id="herring" src="/daily.webp?t=%%TS%%" alt="IP Herring" title="Click to request a custom image">
-<center>
-\t<h2>%%IP%%</h2>
-</center>
+<div id="ip-box">
+\t<div id="ipv4">%%IPV4%%</div>
+\t<div id="ipv6">%%IPV6%%</div>
+</div>
 <div id="modal" role="dialog" aria-modal="true">
 \t<div class="modal-box">
 \t\t<h3>What would you like Andy, Evan, or both, to do today?</h3>
@@ -379,6 +383,23 @@ const HTML = `<!DOCTYPE html>
 </div>
 <script>
 (function(){
+\tvar ipv4El = document.getElementById('ipv4');
+\tvar ipv6El = document.getElementById('ipv6');
+\tvar haveV4 = ipv4El.textContent.trim().length > 0;
+\tvar haveV6 = ipv6El.textContent.trim().length > 0;
+\tif (!haveV4) {
+\t\tfetch('https://api.ipify.org?format=json')
+\t\t\t.then(function(r){ return r.json(); })
+\t\t\t.then(function(d){ if (d && d.ip) ipv4El.textContent = d.ip; else ipv4El.textContent = '(no IPv4)'; })
+\t\t\t.catch(function(){ ipv4El.textContent = '(no IPv4)'; });
+\t}
+\tif (!haveV6) {
+\t\tfetch('https://api6.ipify.org?format=json')
+\t\t\t.then(function(r){ return r.json(); })
+\t\t\t.then(function(d){ if (d && d.ip) ipv6El.textContent = d.ip; })
+\t\t\t.catch(function(){});
+\t}
+
 \tvar modal = document.getElementById('modal');
 \tvar img = document.getElementById('herring');
 \tvar submit = document.getElementById('submitBtn');
@@ -514,8 +535,12 @@ export default {
       return new Response('Generated');
     }
 
-    const ip = request.headers.get('CF-Connecting-IP') || 'Unknown';
-    const html = HTML.replace('%%IP%%', ip).replace('%%TS%%', Date.now().toString());
+    const ip = request.headers.get('CF-Connecting-IP') || '';
+    const isV6 = ip.includes(':');
+    const html = HTML
+      .replace('%%IPV4%%', isV6 ? '' : ip)
+      .replace('%%IPV6%%', isV6 ? ip : '')
+      .replace('%%TS%%', Date.now().toString());
     return new Response(html, {
       headers: { 'Content-Type': 'text/html;charset=utf-8' },
     });
