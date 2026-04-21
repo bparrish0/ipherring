@@ -298,7 +298,7 @@ const HTML = `<!DOCTYPE html>
 \t\tcolor:#404040;
 \t}
 \t#herring{
-\t\twidth: 60%;
+\t\twidth: 50%;
 \t\tcursor: pointer;
 \t\ttransition: opacity 0.2s;
 \t}
