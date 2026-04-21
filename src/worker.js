@@ -575,10 +575,6 @@ export default {
     }
 
     if (url.pathname === '/regen-current' && request.method === 'POST') {
-      const auth = request.headers.get('Authorization');
-      if (auth !== `Bearer ${env.OPENAI_API_KEY}`) {
-        return new Response('Unauthorized', { status: 401 });
-      }
       try {
         await regenerateFromCurrent(env);
         return new Response('Regenerated');
