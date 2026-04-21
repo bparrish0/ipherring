@@ -38,6 +38,14 @@ const SCENES = [
   'at a tiki bar on a tropical island being served by a parrot bartender',
   'bungee jumping off a bridge over a massive canyon',
   'in a sumo wrestling ring facing a much larger opponent',
+  'mud-bogging a jacked-up pickup truck through a massive swampy field with mud flying everywhere',
+  'noodling for a giant catfish with bare hands in a muddy river',
+  'racing a souped-up riding lawnmower against stock cars at a NASCAR track',
+  'deep-frying a whole turkey in the driveway next to a pickup truck up on cinder blocks',
+  'doing a cannonball off the roof of a double-wide trailer into a backyard kiddie pool',
+  'tending a moonshine still deep in the woods with mason jars stacked everywhere',
+  'riding a mechanical bull at a honky-tonk bar with a longneck beer in each hand',
+  'jumping a creek on a four-wheeler and splashing down into the water',
 ];
 
 const STYLES = [
