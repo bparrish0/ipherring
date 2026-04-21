@@ -233,6 +233,26 @@ async function generateDailyImage(env, randomize = false) {
   await generateImage(env, config);
 }
 
+const NO_LOGO_SUFFIX =
+  ' IMPORTANT: Do NOT reproduce any organization logos, emblems, patches, badges, uniform insignia, name tags, department names, agency markings, ID badges, or lanyards that may appear on clothing or around necks in the source photo. Keep the clothing color and general style, but render shirts as plain (no chest logo, no patches), remove any lanyards or badges entirely, and do not add any replacement logos or emblems.';
+
+async function regenerateFromCurrent(env) {
+  const head = await env.BUCKET.head('daily.webp');
+  if (!head) throw new Error('No current daily image to regenerate from');
+  const meta = head.customMetadata || {};
+  const sourceIndex = SOURCE_IMAGES.findIndex((s) => s.key === meta.source);
+  if (sourceIndex < 0) throw new Error('Unknown source key in metadata: ' + meta.source);
+  const config = meta.style
+    ? {
+        sourceIndex,
+        scene: meta.scene || '',
+        style: meta.style,
+        holidayName: meta.holiday || null,
+      }
+    : { sourceIndex, rawPrompt: (meta.scene || '') + NO_LOGO_SUFFIX };
+  await generateImage(env, config);
+}
+
 const DAILY_CUSTOM_LIMIT = 2;
 
 function getCounterKey() {
@@ -552,6 +572,20 @@ export default {
       }
       await generateDailyImage(env, true);
       return new Response('Generated');
+    }
+
+    if (url.pathname === '/regen-current' && request.method === 'POST') {
+      const auth = request.headers.get('Authorization');
+      if (auth !== `Bearer ${env.OPENAI_API_KEY}`) {
+        return new Response('Unauthorized', { status: 401 });
+      }
+      try {
+        await regenerateFromCurrent(env);
+        return new Response('Regenerated');
+      } catch (err) {
+        console.error(err);
+        return new Response('Regen failed: ' + err.message, { status: 500 });
+      }
     }
 
     const ip = request.headers.get('CF-Connecting-IP') || '';
