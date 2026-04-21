@@ -46,6 +46,16 @@ const SCENES = [
   'tending a moonshine still deep in the woods with mason jars stacked everywhere',
   'riding a mechanical bull at a honky-tonk bar with a longneck beer in each hand',
   'jumping a creek on a four-wheeler and splashing down into the water',
+  'hosting a backyard wrestling tournament on a trampoline with tiki torches lighting up the night',
+  'fishing off the tailgate of a pickup truck parked in a flooded Walmart parking lot',
+  'in a demolition derby smashing a rusted-out sedan into other junkers in a muddy arena',
+  'duct-taping a broken lawn chair back together at a family reunion BBQ surrounded by empty beer cans',
+  'dominating a cornhole championship with pinpoint bean bag tosses while holding a corndog',
+  'holding up a catfish the size of a small car after reeling it in off a rickety fishing boat',
+  'barbecuing a whole hog in a fifty-five gallon drum smoker with smoke pouring out everywhere',
+  'belting out karaoke on top of a honky-tonk bar using a corn dog as a microphone',
+  'chasing a greased pig at a county fair while covered head to toe in mud',
+  'launching a rusted-out pickup truck off a plywood ramp over a creek Dukes-of-Hazzard style',
 ];
 
 const STYLES = [
