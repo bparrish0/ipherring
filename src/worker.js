@@ -142,8 +142,9 @@ function buildPrompt(scene, style, holidayName, source) {
     intro = 'This photo shows a man named Andy.';
   }
 
-  let prompt = `${intro} Extract the people/person from this photo preserving their faces, beards, glasses, hair, build, and clothing. `;
+  let prompt = `${intro} Extract the people/person from this photo preserving their faces, beards, glasses, hair, build, and general clothing style. `;
   prompt += `Do NOT keep any of the original background, surroundings, or setting. `;
+  prompt += `IMPORTANT: Do NOT reproduce any organization logos, emblems, patches, badges, uniform insignia, name tags, department names, agency markings, or other identifying text or symbols that may appear on clothing in the source photo. Keep the clothing color and general style, but render shirts as plain (no chest logo, no patches), and omit any badges entirely. `;
   prompt += `Place them into this completely new scene: ${scene}. `;
   if (source.people === 2) {
     prompt += `If the scene mentions only one of them by name, include only that person. If it mentions both or neither, include both Andy and Evan together. `;
