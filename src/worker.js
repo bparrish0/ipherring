@@ -235,6 +235,51 @@ async function generateDailyImage(env, randomize = false) {
 const NO_LOGO_SUFFIX =
   ' IMPORTANT: Do NOT reproduce any organization logos, emblems, patches, badges, uniform insignia, name tags, department names, agency markings, ID badges, or lanyards that may appear on clothing or around necks in the source photo. Keep the clothing color and general style, but render shirts as plain (no chest logo, no patches), remove any lanyards or badges entirely, and do not add any replacement logos or emblems.';
 
+async function cleanSource(env, sourceKey, size) {
+  const obj = await env.BUCKET.get(sourceKey);
+  if (!obj) throw new Error('Source not found: ' + sourceKey);
+  const bytes = await obj.arrayBuffer();
+  const contentType = obj.httpMetadata?.contentType || 'image/jpeg';
+  const blob = new Blob([bytes], { type: contentType });
+
+  await env.BUCKET.put('source-backup/' + sourceKey.replace(/^source\//, ''), bytes, {
+    httpMetadata: { contentType },
+  });
+
+  const prompt =
+    'Keep this photograph exactly the same as the original — same people, same faces, hair, beards, glasses, same clothing color and style, same pose, same background (building, trees, sky, parking lot, vehicles), same lighting, same composition and framing. ' +
+    'The ONLY change: completely remove any and all organization logos, emblems, patches, name tags, uniform insignia, department markings, ID badges on lanyards, and lanyards themselves from the people and their clothing. ' +
+    'Render any button-up or polo shirt with a plain chest (no logo, no patch, no embroidery) while keeping the exact same shirt color and fabric style. ' +
+    'Remove any lanyards and ID badges from around necks entirely — nothing around their necks. ' +
+    'Do NOT add any replacement logos, emblems, or text. Do NOT alter faces, hair, beards, glasses, skin, build, pose, or background in any way. The result should be indistinguishable from the original except for the removed logos and badges.';
+
+  const formData = new FormData();
+  formData.append('model', 'gpt-image-2');
+  formData.append('image[]', blob, 'source.jpg');
+  formData.append('prompt', prompt);
+  formData.append('n', '1');
+  formData.append('size', size || '1024x1536');
+  formData.append('quality', 'high');
+  formData.append('output_format', 'jpeg');
+  formData.append('output_compression', '95');
+
+  const response = await fetch('https://api.openai.com/v1/images/edits', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${env.OPENAI_API_KEY}` },
+    body: formData,
+  });
+  if (!response.ok) {
+    throw new Error('OpenAI error: ' + response.status + ' ' + (await response.text()).substring(0, 500));
+  }
+  const result = await response.json();
+  const b64 = result.data[0].b64_json;
+  const imageBytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+
+  await env.BUCKET.put(sourceKey, imageBytes, {
+    httpMetadata: { contentType: 'image/jpeg' },
+  });
+}
+
 async function regenerateFromCurrent(env) {
   const head = await env.BUCKET.head('daily.webp');
   if (!head) throw new Error('No current daily image to regenerate from');
@@ -571,6 +616,35 @@ export default {
       }
       await generateDailyImage(env, true);
       return new Response('Generated');
+    }
+
+    if (url.pathname === '/clean-source' && request.method === 'POST') {
+      try {
+        const body = await request.json();
+        if (!body.key || !body.key.startsWith('source/')) {
+          return new Response('Invalid key', { status: 400 });
+        }
+        await cleanSource(env, body.key, body.size);
+        return new Response('Cleaned: ' + body.key);
+      } catch (err) {
+        console.error(err);
+        return new Response('Clean failed: ' + err.message, { status: 500 });
+      }
+    }
+
+    if (url.pathname.startsWith('/peek/') && request.method === 'GET') {
+      const key = url.pathname.replace(/^\/peek\//, '');
+      if (!key.startsWith('source/') && !key.startsWith('source-backup/')) {
+        return new Response('Forbidden', { status: 403 });
+      }
+      const obj = await env.BUCKET.get(key);
+      if (!obj) return new Response('Not found', { status: 404 });
+      return new Response(obj.body, {
+        headers: {
+          'Content-Type': obj.httpMetadata?.contentType || 'application/octet-stream',
+          'Cache-Control': 'no-cache',
+        },
+      });
     }
 
     if (url.pathname === '/regen-current' && request.method === 'POST') {
