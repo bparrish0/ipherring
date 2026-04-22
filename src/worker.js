@@ -171,13 +171,12 @@ async function generateImage(env, config) {
   console.log(`Generating - Source: ${source.key} (${source.people} people), Prompt: "${prompt.substring(0, 200)}"`);
 
   const formData = new FormData();
-  formData.append('model', 'gpt-image-1.5');
+  formData.append('model', 'gpt-image-2');
   formData.append('image[]', sourceBlob, 'source.png');
   formData.append('prompt', prompt);
   formData.append('n', '1');
   formData.append('size', '1024x1024');
   formData.append('quality', 'high');
-  formData.append('input_fidelity', 'high');
   formData.append('output_format', 'webp');
   formData.append('output_compression', '80');
 
