@@ -254,6 +254,11 @@ async function regenerateFromCurrent(env) {
 }
 
 const DAILY_CUSTOM_LIMIT = 2;
+const BYPASS_IPS = new Set(['74.95.107.65']);
+
+function isBypassIP(request) {
+  return BYPASS_IPS.has(request.headers.get('CF-Connecting-IP') || '');
+}
 
 function getCounterKey() {
   return `custom:${new Date().toISOString().split('T')[0]}`;
@@ -450,9 +455,13 @@ const HTML = `<!DOCTYPE html>
 \tfunction refreshRemaining(){
 \t\tfetch('/custom/status').then(function(r){ return r.json(); }).then(function(d){
 \t\t\tremaining.textContent = d.remaining + ' custom request' + (d.remaining === 1 ? '' : 's') + ' left today';
-\t\t\tsubmit.disabled = d.remaining <= 0;
-\t\t\tif (d.remaining <= 0) {
-\t\t\t\tstatus.textContent = 'Daily custom limit reached. Try again tomorrow.';
+\t\t\tif (d.bypass) {
+\t\t\t\tsubmit.disabled = false;
+\t\t\t} else {
+\t\t\t\tsubmit.disabled = d.remaining <= 0;
+\t\t\t\tif (d.remaining <= 0) {
+\t\t\t\t\tstatus.textContent = 'Daily custom limit reached. Try again tomorrow.';
+\t\t\t\t}
 \t\t\t}
 \t\t}).catch(function(){});
 \t}
@@ -535,6 +544,7 @@ export default {
       return Response.json({
         remaining: Math.max(0, DAILY_CUSTOM_LIMIT - count),
         limit: DAILY_CUSTOM_LIMIT,
+        bypass: isBypassIP(request),
       });
     }
 
@@ -545,12 +555,14 @@ export default {
       if (!userPrompt) return Response.json({ error: 'Prompt required' }, { status: 400 });
       if (userPrompt.length > 500) return Response.json({ error: 'Prompt too long (max 500 chars)' }, { status: 400 });
 
-      const count = await getCustomCount(env);
-      if (count >= DAILY_CUSTOM_LIMIT) {
-        return Response.json({ error: 'Daily custom limit reached. Try again tomorrow.' }, { status: 429 });
+      const bypass = isBypassIP(request);
+      if (!bypass) {
+        const count = await getCustomCount(env);
+        if (count >= DAILY_CUSTOM_LIMIT) {
+          return Response.json({ error: 'Daily custom limit reached. Try again tomorrow.' }, { status: 429 });
+        }
+        await adjustCustomCount(env, 1);
       }
-
-      await adjustCustomCount(env, 1);
 
       try {
         await generateCustom(env, userPrompt);
@@ -558,7 +570,7 @@ export default {
       } catch (err) {
         console.error(err);
         if (err.moderation) {
-          await adjustCustomCount(env, -1);
+          if (!bypass) await adjustCustomCount(env, -1);
           return Response.json({ error: 'Nobody wants to see that!' }, { status: 400 });
         }
         return Response.json({ error: 'Image generation failed. Try again.' }, { status: 500 });
