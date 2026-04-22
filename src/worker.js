@@ -574,11 +574,6 @@ export default {
       return new Response('Generated');
     }
 
-    if (url.pathname === '/reset-customs' && request.method === 'POST') {
-      await env.RATE_LIMIT.delete(getCounterKey());
-      return new Response('Reset');
-    }
-
     if (url.pathname === '/regen-current' && request.method === 'POST') {
       const auth = request.headers.get('Authorization');
       if (auth !== `Bearer ${env.OPENAI_API_KEY}`) {
