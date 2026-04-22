@@ -254,12 +254,13 @@ async function cleanSource(env, sourceKey, size) {
     'Do NOT add any replacement logos, emblems, or text. Do NOT alter faces, hair, beards, glasses, skin, build, pose, or background in any way. The result should be indistinguishable from the original except for the removed logos and badges.';
 
   const formData = new FormData();
-  formData.append('model', 'gpt-image-2');
+  formData.append('model', 'gpt-image-1.5');
   formData.append('image[]', blob, 'source.jpg');
   formData.append('prompt', prompt);
   formData.append('n', '1');
   formData.append('size', size || '1024x1536');
   formData.append('quality', 'high');
+  formData.append('input_fidelity', 'high');
   formData.append('output_format', 'jpeg');
   formData.append('output_compression', '95');
 
