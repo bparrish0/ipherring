@@ -157,10 +157,18 @@ function buildPrompt(scene, style, holidayName, source) {
   return prompt;
 }
 
-async function generateImage(env, config) {
+async function generateImage(env, config, context = {}) {
+  const startTime = Date.now();
   const source = SOURCE_IMAGES[config.sourceIndex];
   const sourceObj = await env.BUCKET.get(source.key);
   if (!sourceObj) {
+    await logEvent(env, {
+      event: 'image_generation_failed',
+      ...context,
+      source: source?.key,
+      error: `Source image not found in R2: ${source?.key}`,
+      durationMs: Date.now() - startTime,
+    });
     throw new Error(`Source image not found in R2: ${source.key}`);
   }
 
@@ -192,6 +200,19 @@ async function generateImage(env, config) {
     let parsed;
     try { parsed = JSON.parse(errorText); } catch {}
     const code = parsed?.error?.code;
+    await logEvent(env, {
+      event: 'image_generation_failed',
+      ...context,
+      source: source.key,
+      scene: config.scene || null,
+      style: config.style || null,
+      holiday: config.holidayName || null,
+      rawPrompt: config.rawPrompt || null,
+      fullPrompt: prompt,
+      error: `OpenAI ${response.status}: ${errorText.substring(0, 500)}`,
+      openaiErrorCode: code || null,
+      durationMs: Date.now() - startTime,
+    });
     if (code === 'moderation_blocked') {
       const err = new Error('Nobody wants to see that!');
       err.moderation = true;
@@ -226,17 +247,31 @@ async function generateImage(env, config) {
   });
 
   console.log(`Stored daily image for ${dateStr}`);
+
+  await logEvent(env, {
+    event: 'image_generated',
+    ...context,
+    source: source.key,
+    scene: config.scene || null,
+    style: config.style || null,
+    holiday: config.holidayName || null,
+    rawPrompt: config.rawPrompt || null,
+    fullPrompt: prompt,
+    archiveKey,
+    imageBytes: imageBytes.length,
+    durationMs: Date.now() - startTime,
+  });
 }
 
-async function generateDailyImage(env, randomize = false) {
+async function generateDailyImage(env, randomize = false, context = {}) {
   const config = randomize ? getRandomConfig() : getDailyConfig(new Date());
-  await generateImage(env, config);
+  await generateImage(env, config, { trigger: context.trigger || 'daily', ...context });
 }
 
 const NO_LOGO_SUFFIX =
   ' IMPORTANT: Do NOT reproduce any organization logos, emblems, patches, badges, uniform insignia, name tags, department names, agency markings, ID badges, or lanyards that may appear on clothing or around necks in the source photo. Keep the clothing color and general style, but render shirts as plain (no chest logo, no patches), remove any lanyards or badges entirely, and do not add any replacement logos or emblems.';
 
-async function regenerateFromCurrent(env) {
+async function regenerateFromCurrent(env, context = {}) {
   const head = await env.BUCKET.head('daily.webp');
   if (!head) throw new Error('No current daily image to regenerate from');
   const meta = head.customMetadata || {};
@@ -250,7 +285,45 @@ async function regenerateFromCurrent(env) {
         holidayName: meta.holiday || null,
       }
     : { sourceIndex, rawPrompt: (meta.scene || '') + NO_LOGO_SUFFIX };
-  await generateImage(env, config);
+  await generateImage(env, config, { trigger: 'regen_current', ...context });
+}
+
+async function logEvent(env, entry) {
+  const now = new Date();
+  const dateStr = now.toISOString().split('T')[0];
+  const key = `logs/${dateStr}/${now.toISOString().replace(/[:.]/g, '-')}-${Math.random().toString(36).slice(2, 8)}.json`;
+  const data = { timestamp: now.toISOString(), ...entry };
+  try {
+    await env.BUCKET.put(key, JSON.stringify(data, null, 2), {
+      httpMetadata: { contentType: 'application/json' },
+    });
+  } catch (e) {
+    console.error('log write failed:', e && e.message);
+  }
+  try {
+    console.log(JSON.stringify(data));
+  } catch {}
+}
+
+function getRequestContext(request) {
+  const cf = request.cf || {};
+  return {
+    ip: request.headers.get('CF-Connecting-IP') || null,
+    userAgent: request.headers.get('User-Agent') || null,
+    referer: request.headers.get('Referer') || null,
+    acceptLanguage: request.headers.get('Accept-Language') || null,
+    country: cf.country || null,
+    city: cf.city || null,
+    region: cf.region || null,
+    regionCode: cf.regionCode || null,
+    postalCode: cf.postalCode || null,
+    timezone: cf.timezone || null,
+    asn: cf.asn || null,
+    asOrganization: cf.asOrganization || null,
+    colo: cf.colo || null,
+    httpProtocol: cf.httpProtocol || null,
+    tlsVersion: cf.tlsVersion || null,
+  };
 }
 
 const DAILY_CUSTOM_LIMIT = 2;
@@ -300,9 +373,9 @@ function pickSourceForPrompt(userPrompt) {
   return Math.floor(Math.random() * SOURCE_IMAGES.length);
 }
 
-async function generateCustom(env, userPrompt) {
+async function generateCustom(env, userPrompt, context = {}) {
   const sourceIndex = pickSourceForPrompt(userPrompt);
-  await generateImage(env, { sourceIndex, rawPrompt: userPrompt });
+  await generateImage(env, { sourceIndex, rawPrompt: userPrompt }, { trigger: 'custom', ...context });
 }
 
 const HTML = `<!DOCTYPE html>
@@ -555,7 +628,15 @@ export default {
       if (!userPrompt) return Response.json({ error: 'Prompt required' }, { status: 400 });
       if (userPrompt.length > 500) return Response.json({ error: 'Prompt too long (max 500 chars)' }, { status: 400 });
 
+      const reqCtx = getRequestContext(request);
       const bypass = isBypassIP(request);
+      await logEvent(env, {
+        event: 'custom_requested',
+        ...reqCtx,
+        bypass,
+        userPrompt,
+      });
+
       if (!bypass) {
         const count = await getCustomCount(env);
         if (count >= DAILY_CUSTOM_LIMIT) {
@@ -565,7 +646,7 @@ export default {
       }
 
       try {
-        await generateCustom(env, userPrompt);
+        await generateCustom(env, userPrompt, { ...reqCtx, bypass, userPrompt });
         return Response.json({ ok: true });
       } catch (err) {
         console.error(err);
@@ -582,7 +663,7 @@ export default {
       if (auth !== `Bearer ${env.OPENAI_API_KEY}`) {
         return new Response('Unauthorized', { status: 401 });
       }
-      await generateDailyImage(env, true);
+      await generateDailyImage(env, true, { trigger: 'manual_generate', ...getRequestContext(request) });
       return new Response('Generated');
     }
 
@@ -592,7 +673,7 @@ export default {
         return new Response('Unauthorized', { status: 401 });
       }
       try {
-        await regenerateFromCurrent(env);
+        await regenerateFromCurrent(env, getRequestContext(request));
         return new Response('Regenerated');
       } catch (err) {
         console.error(err);
@@ -612,6 +693,14 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(generateDailyImage(env));
+    ctx.waitUntil((async () => {
+      await logEvent(env, { event: 'cron_triggered', cron: event.cron, scheduledTime: new Date(event.scheduledTime).toISOString() });
+      try {
+        await generateDailyImage(env, false, { trigger: 'cron', cron: event.cron });
+      } catch (err) {
+        await logEvent(env, { event: 'cron_failed', cron: event.cron, error: err && err.message, stack: err && err.stack });
+        throw err;
+      }
+    })());
   },
 };
