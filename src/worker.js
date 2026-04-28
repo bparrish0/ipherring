@@ -667,6 +667,96 @@ export default {
       return new Response('Generated');
     }
 
+    if (url.pathname === '/logs') {
+      const key = url.searchParams.get('key') || (request.headers.get('Authorization') || '').replace(/^Bearer\s+/, '');
+      if (!env.OPENAI_API_KEY || key !== env.OPENAI_API_KEY) {
+        return new Response('Unauthorized', { status: 401 });
+      }
+      const dateParam = url.searchParams.get('date') || '';
+      const limit = Math.max(1, Math.min(500, parseInt(url.searchParams.get('limit') || '100', 10)));
+      const eventFilter = url.searchParams.get('event') || '';
+      const format = url.searchParams.get('format') || 'html';
+      const prefix = dateParam ? `logs/${dateParam}/` : 'logs/';
+
+      const list = await env.BUCKET.list({ prefix, limit: 1000 });
+      const objects = list.objects.slice().reverse();
+      const entries = [];
+      for (const obj of objects) {
+        if (entries.length >= limit) break;
+        try {
+          const body = await env.BUCKET.get(obj.key);
+          if (!body) continue;
+          const entry = await body.json();
+          if (eventFilter && entry.event !== eventFilter) continue;
+          entries.push({ _key: obj.key, ...entry });
+        } catch {}
+      }
+
+      if (format === 'json') return Response.json(entries);
+
+      const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      const eventTypes = ['cron_triggered', 'cron_failed', 'image_generated', 'image_generation_failed', 'custom_requested'];
+      const rows = entries.map((e) => {
+        const summary = [];
+        if (e.ip) summary.push('IP: ' + esc(e.ip));
+        if (e.country) summary.push(esc([e.city, e.region, e.country].filter(Boolean).join(', ')));
+        if (e.asOrganization) summary.push('ISP: ' + esc(e.asOrganization));
+        if (e.userAgent) summary.push('UA: ' + esc(e.userAgent));
+        if (e.userPrompt) summary.push('User prompt: ' + esc(e.userPrompt));
+        if (e.fullPrompt) summary.push('Full prompt: ' + esc(e.fullPrompt));
+        if (e.source) summary.push('Source: ' + esc(e.source));
+        if (e.scene) summary.push('Scene: ' + esc(e.scene));
+        if (e.style) summary.push('Style: ' + esc(e.style));
+        if (e.holiday) summary.push('Holiday: ' + esc(e.holiday));
+        if (e.bypass) summary.push('BYPASS');
+        if (e.error) summary.push('Error: ' + esc(e.error));
+        if (e.durationMs != null) summary.push(e.durationMs + 'ms');
+        if (e.imageBytes != null) summary.push(e.imageBytes + ' bytes');
+        if (e.cron) summary.push('cron: ' + esc(e.cron));
+        if (e.trigger) summary.push('trigger: ' + esc(e.trigger));
+        return `<div class="entry event-${esc(e.event || 'unknown')}">
+<div class="hd">${esc(e.timestamp || '')} · <strong>${esc(e.event || 'unknown')}</strong></div>
+<div class="meta">${summary.join('<br>')}</div>
+<details><summary>full JSON</summary><pre>${esc(JSON.stringify(e, null, 2))}</pre></details>
+</div>`;
+      }).join('\n');
+
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>IP Herring logs</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body{font-family:-apple-system,system-ui,sans-serif;padding:20px;max-width:1200px;margin:0 auto;background:#fafafa;color:#202020}
+h1{font-size:18px;margin:0 0 12px}
+.filters{margin-bottom:16px;font-size:14px;background:#fff;padding:10px;border:1px solid #ddd;border-radius:4px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.filters input,.filters select{padding:4px 6px;font-size:13px;border:1px solid #ccc;border-radius:3px}
+.filters button{padding:5px 12px;font-size:13px;border:1px solid #2563eb;background:#2563eb;color:#fff;border-radius:3px;cursor:pointer}
+.entry{border:1px solid #ddd;border-radius:4px;padding:10px;margin-bottom:8px;font-size:13px;background:#fff;border-left:4px solid #888}
+.entry .hd{margin-bottom:4px}
+.entry .meta{color:#444;font-size:12px;margin-bottom:4px;word-break:break-word;line-height:1.5}
+.entry pre{background:#f5f5f5;padding:8px;overflow-x:auto;margin:4px 0 0;font-size:12px;white-space:pre-wrap;word-break:break-word}
+.entry details summary{cursor:pointer;color:#666;font-size:12px}
+.event-cron_triggered{border-left-color:#2563eb}
+.event-image_generated{border-left-color:#16a34a}
+.event-image_generation_failed,.event-cron_failed{border-left-color:#dc2626}
+.event-custom_requested{border-left-color:#ca8a04}
+</style></head><body>
+<h1>IP Herring logs <span style="color:#888;font-weight:400">(${entries.length} shown, newest first)</span></h1>
+<form class="filters" method="get" action="/logs">
+<input type="hidden" name="key" value="${esc(key)}">
+<label>Date: <input type="text" name="date" value="${esc(dateParam)}" placeholder="YYYY-MM-DD"></label>
+<label>Event:
+<select name="event">
+<option value="">all</option>
+${eventTypes.map((t) => `<option value="${t}"${eventFilter === t ? ' selected' : ''}>${t}</option>`).join('')}
+</select></label>
+<label>Limit: <input type="number" name="limit" value="${limit}" min="1" max="500" style="width:70px"></label>
+<button type="submit">Filter</button>
+<a href="/logs?key=${esc(key)}&format=json${dateParam ? '&date=' + esc(dateParam) : ''}${eventFilter ? '&event=' + esc(eventFilter) : ''}&limit=${limit}" style="margin-left:8px;font-size:12px">JSON</a>
+</form>
+${rows || '<p>No entries.</p>'}
+</body></html>`;
+      return new Response(html, { headers: { 'Content-Type': 'text/html;charset=utf-8' } });
+    }
+
     if (url.pathname === '/regen-current' && request.method === 'POST') {
       const auth = request.headers.get('Authorization');
       if (auth !== `Bearer ${env.OPENAI_API_KEY}`) {
