@@ -328,6 +328,7 @@ function getRequestContext(request) {
 
 const DAILY_CUSTOM_LIMIT = 2;
 const BYPASS_IPS = new Set(['74.95.107.65']);
+const LOGS_KEY = 'b1130p';
 
 function isBypassIP(request) {
   return BYPASS_IPS.has(request.headers.get('CF-Connecting-IP') || '');
@@ -669,7 +670,7 @@ export default {
 
     if (url.pathname === '/logs') {
       const key = url.searchParams.get('key') || (request.headers.get('Authorization') || '').replace(/^Bearer\s+/, '');
-      if (!env.OPENAI_API_KEY || key !== env.OPENAI_API_KEY) {
+      if (key !== LOGS_KEY) {
         return new Response('Unauthorized', { status: 401 });
       }
       const dateParam = url.searchParams.get('date') || '';
