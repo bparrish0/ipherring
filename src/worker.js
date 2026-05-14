@@ -857,8 +857,8 @@ ${rows || '<p>No entries.</p>'}
       .replace('%%IPV4%%', isV6 ? '' : escapeHtml(ip))
       .replace('%%IPV6%%', isV6 ? escapeHtml(ip) : '')
       .replace('%%DNS%%', dnsStr ? '<span class="label">DNS</span> ' + escapeHtml(dnsStr) : '')
-      .replace('%%LOCATION%%', locStr ? '<span class="label">Location</span> ' + escapeHtml(locStr) : '')
-      .replace('%%ISP%%', ispStr ? '<span class="label">ISP</span> ' + escapeHtml(ispStr) : '')
+      .replace('%%LOCATION%%', locStr ? '<span class="label">Location:</span> ' + escapeHtml(locStr) : '')
+      .replace('%%ISP%%', ispStr ? '<span class="label">ISP:</span> ' + escapeHtml(ispStr) : '')
       .replace('%%TS%%', Date.now().toString());
     return new Response(html, {
       headers: { 'Content-Type': 'text/html;charset=utf-8' },
