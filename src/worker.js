@@ -520,7 +520,6 @@ const HTML = `<!DOCTYPE html>
 \t#ipv6{ font-size: 0.95em; color: #808080; margin: 4px 0 0; font-family: ui-monospace, Menlo, Consolas, monospace; min-height: 1em; }
 \t#ip-info{ margin-top: 10px; font-size: 0.8em; color: #707070; line-height: 1.7; }
 \t#ip-info > div:empty{ display: none; }
-\t#ip-info .label{ color: #a0a0a0; }
 \t.spinner{
 \t\tdisplay: inline-block;
 \t\twidth: 14px;
@@ -856,9 +855,9 @@ ${rows || '<p>No entries.</p>'}
     const html = HTML
       .replace('%%IPV4%%', isV6 ? '' : escapeHtml(ip))
       .replace('%%IPV6%%', isV6 ? escapeHtml(ip) : '')
-      .replace('%%DNS%%', dnsStr ? '<span class="label">DNS</span> ' + escapeHtml(dnsStr) : '')
-      .replace('%%LOCATION%%', locStr ? '<span class="label">Location:</span> ' + escapeHtml(locStr) : '')
-      .replace('%%ISP%%', ispStr ? '<span class="label">ISP:</span> ' + escapeHtml(ispStr) : '')
+      .replace('%%DNS%%', escapeHtml(dnsStr))
+      .replace('%%LOCATION%%', escapeHtml(locStr))
+      .replace('%%ISP%%', escapeHtml(ispStr))
       .replace('%%TS%%', Date.now().toString());
     return new Response(html, {
       headers: { 'Content-Type': 'text/html;charset=utf-8' },
