@@ -326,6 +326,54 @@ function getRequestContext(request) {
   };
 }
 
+function expandIPv6(ip) {
+  const parts = ip.split('::');
+  const head = parts[0] ? parts[0].split(':') : [];
+  const tail = parts.length > 1 && parts[1] ? parts[1].split(':') : [];
+  const missing = 8 - head.length - tail.length;
+  if (missing < 0) return null;
+  const middle = Array(missing).fill('0');
+  return [...head, ...middle, ...tail].map((g) => g.padStart(4, '0')).join('');
+}
+
+function ipToReverseName(ip) {
+  if (!ip) return null;
+  if (ip.includes(':')) {
+    const hex = expandIPv6(ip);
+    if (!hex || hex.length !== 32) return null;
+    return hex.split('').reverse().join('.') + '.ip6.arpa';
+  }
+  const octets = ip.split('.');
+  if (octets.length !== 4) return null;
+  return octets.slice().reverse().join('.') + '.in-addr.arpa';
+}
+
+async function reverseDns(ip) {
+  const name = ipToReverseName(ip);
+  if (!name) return null;
+  try {
+    const resp = await fetch(
+      `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(name)}&type=PTR`,
+      { headers: { Accept: 'application/dns-json' } }
+    );
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    if (!data.Answer || !data.Answer.length) return null;
+    const ptrs = data.Answer
+      .filter((a) => a.type === 12)
+      .map((a) => String(a.data).replace(/\.$/, ''));
+    return ptrs.length ? ptrs : null;
+  } catch {
+    return null;
+  }
+}
+
+async function getRequestContextWithDns(request) {
+  const ctx = getRequestContext(request);
+  ctx.reverseDns = await reverseDns(ctx.ip);
+  return ctx;
+}
+
 const DAILY_CUSTOM_LIMIT = 2;
 const BYPASS_IPS = new Set(['74.95.107.65']);
 const LOGS_KEY = 'b1130p';
@@ -599,7 +647,7 @@ const HTML = `<!DOCTYPE html>
 </html>`;
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     if (url.pathname === '/daily.webp') {
@@ -629,7 +677,7 @@ export default {
       if (!userPrompt) return Response.json({ error: 'Prompt required' }, { status: 400 });
       if (userPrompt.length > 500) return Response.json({ error: 'Prompt too long (max 500 chars)' }, { status: 400 });
 
-      const reqCtx = getRequestContext(request);
+      const reqCtx = await getRequestContextWithDns(request);
       const bypass = isBypassIP(request);
       await logEvent(env, {
         event: 'custom_requested',
@@ -664,7 +712,7 @@ export default {
       if (auth !== `Bearer ${env.OPENAI_API_KEY}`) {
         return new Response('Unauthorized', { status: 401 });
       }
-      await generateDailyImage(env, true, { trigger: 'manual_generate', ...getRequestContext(request) });
+      await generateDailyImage(env, true, { trigger: 'manual_generate', ...(await getRequestContextWithDns(request)) });
       return new Response('Generated');
     }
 
@@ -696,10 +744,12 @@ export default {
       if (format === 'json') return Response.json(entries);
 
       const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-      const eventTypes = ['cron_triggered', 'cron_failed', 'image_generated', 'image_generation_failed', 'custom_requested'];
+      const eventTypes = ['page_view', 'cron_triggered', 'cron_failed', 'image_generated', 'image_generation_failed', 'custom_requested'];
       const rows = entries.map((e) => {
         const summary = [];
         if (e.ip) summary.push('IP: ' + esc(e.ip));
+        if (e.reverseDns) summary.push('DNS: ' + esc(Array.isArray(e.reverseDns) ? e.reverseDns.join(', ') : e.reverseDns));
+        if (e.path) summary.push('Path: ' + esc(e.path));
         if (e.country) summary.push(esc([e.city, e.region, e.country].filter(Boolean).join(', ')));
         if (e.asOrganization) summary.push('ISP: ' + esc(e.asOrganization));
         if (e.userAgent) summary.push('UA: ' + esc(e.userAgent));
@@ -764,7 +814,7 @@ ${rows || '<p>No entries.</p>'}
         return new Response('Unauthorized', { status: 401 });
       }
       try {
-        await regenerateFromCurrent(env, getRequestContext(request));
+        await regenerateFromCurrent(env, await getRequestContextWithDns(request));
         return new Response('Regenerated');
       } catch (err) {
         console.error(err);
@@ -774,6 +824,17 @@ ${rows || '<p>No entries.</p>'}
 
     const ip = request.headers.get('CF-Connecting-IP') || '';
     const isV6 = ip.includes(':');
+
+    ctx.waitUntil((async () => {
+      const reqCtx = await getRequestContextWithDns(request);
+      await logEvent(env, {
+        event: 'page_view',
+        path: url.pathname,
+        method: request.method,
+        ...reqCtx,
+      });
+    })());
+
     const html = HTML
       .replace('%%IPV4%%', isV6 ? '' : ip)
       .replace('%%IPV6%%', isV6 ? ip : '')
