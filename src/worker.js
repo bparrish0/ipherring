@@ -354,7 +354,7 @@ async function reverseDns(ip) {
   try {
     const resp = await fetch(
       `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(name)}&type=PTR`,
-      { headers: { Accept: 'application/dns-json' } }
+      { headers: { Accept: 'application/dns-json' }, signal: AbortSignal.timeout(3000) }
     );
     if (!resp.ok) return null;
     const data = await resp.json();
@@ -372,6 +372,10 @@ async function getRequestContextWithDns(request) {
   const ctx = getRequestContext(request);
   ctx.reverseDns = await reverseDns(ctx.ip);
   return ctx;
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 const DAILY_CUSTOM_LIMIT = 2;
@@ -446,7 +450,7 @@ const HTML = `<!DOCTYPE html>
 \t\tcolor:#404040;
 \t}
 \t#herring{
-\t\twidth: 50%;
+\t\twidth: 45%;
 \t\tcursor: pointer;
 \t\ttransition: opacity 0.2s;
 \t}
@@ -514,6 +518,9 @@ const HTML = `<!DOCTYPE html>
 \t#ip-box{ margin: 4px 0 24px; }
 \t#ipv4{ font-size: 1.5em; font-weight: 500; color: #404040; margin: 0; }
 \t#ipv6{ font-size: 0.95em; color: #808080; margin: 4px 0 0; font-family: ui-monospace, Menlo, Consolas, monospace; min-height: 1em; }
+\t#ip-info{ margin-top: 10px; font-size: 0.8em; color: #707070; line-height: 1.7; }
+\t#ip-info > div:empty{ display: none; }
+\t#ip-info .label{ color: #a0a0a0; }
 \t.spinner{
 \t\tdisplay: inline-block;
 \t\twidth: 14px;
@@ -534,6 +541,11 @@ const HTML = `<!DOCTYPE html>
 <div id="ip-box">
 \t<div id="ipv4">%%IPV4%%</div>
 \t<div id="ipv6">%%IPV6%%</div>
+\t<div id="ip-info">
+\t\t<div id="dns">%%DNS%%</div>
+\t\t<div id="location">%%LOCATION%%</div>
+\t\t<div id="isp">%%ISP%%</div>
+\t</div>
 </div>
 <div id="modal" role="dialog" aria-modal="true">
 \t<div class="modal-box">
@@ -824,9 +836,12 @@ ${rows || '<p>No entries.</p>'}
 
     const ip = request.headers.get('CF-Connecting-IP') || '';
     const isV6 = ip.includes(':');
+    const cf = request.cf || {};
+    const ptr = await reverseDns(ip);
 
     ctx.waitUntil((async () => {
-      const reqCtx = await getRequestContextWithDns(request);
+      const reqCtx = getRequestContext(request);
+      reqCtx.reverseDns = ptr;
       await logEvent(env, {
         event: 'page_view',
         path: url.pathname,
@@ -835,9 +850,15 @@ ${rows || '<p>No entries.</p>'}
       });
     })());
 
+    const dnsStr = ptr && ptr.length ? ptr.join(', ') : '';
+    const locStr = [cf.city, cf.region, cf.country].filter(Boolean).join(', ');
+    const ispStr = cf.asOrganization || '';
     const html = HTML
-      .replace('%%IPV4%%', isV6 ? '' : ip)
-      .replace('%%IPV6%%', isV6 ? ip : '')
+      .replace('%%IPV4%%', isV6 ? '' : escapeHtml(ip))
+      .replace('%%IPV6%%', isV6 ? escapeHtml(ip) : '')
+      .replace('%%DNS%%', dnsStr ? '<span class="label">DNS</span> ' + escapeHtml(dnsStr) : '')
+      .replace('%%LOCATION%%', locStr ? '<span class="label">Location</span> ' + escapeHtml(locStr) : '')
+      .replace('%%ISP%%', ispStr ? '<span class="label">ISP</span> ' + escapeHtml(ispStr) : '')
       .replace('%%TS%%', Date.now().toString());
     return new Response(html, {
       headers: { 'Content-Type': 'text/html;charset=utf-8' },
