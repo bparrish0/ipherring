@@ -12,7 +12,7 @@ function loadWorker(overrides = {}) {
     ...overrides,
   });
   vm.runInContext(code.replace('export default {', 'globalThis.worker = {') + `
-    globalThis.api = { SOURCE_IMAGES, getDailyConfig, getRandomConfig, buildPrompt,
+    globalThis.api = { SOURCE_IMAGES, SCENES, getDailyConfig, getRandomConfig, buildPrompt,
       generateDailyImage, generateCustom, pickSourceForPrompt };
   `, context);
   return context;
@@ -69,6 +69,49 @@ function assertAndyOnly(context, config) {
   assert.match(prompt, /Feature only Andy as the main subject/);
   assert.doesNotMatch(prompt, /\bEvan\b/i);
 }
+
+test('default rotation contains exactly 100 unique Andy-only scenes', () => {
+  const { SCENES } = loadWorker().api;
+  assert.equal(SCENES.length, 100);
+  assert.equal(new Set(SCENES).size, 100);
+  for (const scene of SCENES) {
+    assert.ok(scene.trim().length > 40);
+    assert.doesNotMatch(scene, /\bEvan\b/i);
+  }
+});
+
+test('all daily dates including holidays select only from the new rotation', () => {
+  const context = loadWorker();
+  const scenes = new Set(context.api.SCENES);
+  const seen = new Set();
+  for (const year of [2026, 2028]) {
+    for (let date = new Date(Date.UTC(year, 0, 1)); date.getUTCFullYear() === year;
+      date = new Date(date.getTime() + 86400000)) {
+      const config = context.api.getDailyConfig(date);
+      assert.ok(scenes.has(config.scene), `out-of-rotation scene on ${date.toISOString()}`);
+      assert.equal(config.holidayName, null);
+      seen.add(config.scene);
+    }
+  }
+  assert.equal(seen.size, 100);
+});
+
+test('random generation stays in the new rotation even on retired holiday dates', () => {
+  for (const date of ['2026-01-01', '2026-07-04', '2026-10-31', '2026-12-25']) {
+    class FixedDate extends Date {
+      constructor(...args) { super(...(args.length ? args : [date + 'T12:00:00Z'])); }
+    }
+    const context = loadWorker({ Date: FixedDate });
+    const scenes = new Set(context.api.SCENES);
+    for (let i = 0; i < 100; i++) {
+      context.Math.random = () => (i + 0.5) / 100;
+      const config = context.api.getRandomConfig();
+      assert.ok(scenes.has(config.scene), `out-of-rotation random scene on ${date}`);
+      assert.equal(config.holidayName, null);
+      assertAndyOnly(context, config);
+    }
+  }
+});
 
 test('every default daily configuration uses an Andy-only source, including leap years and holidays', () => {
   const context = loadWorker();

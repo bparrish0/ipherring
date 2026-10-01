@@ -14,54 +14,106 @@ const ANDY_SOURCE_INDICES = SOURCE_IMAGES
   .map(({ index }) => index);
 
 const SCENES = [
-  'riding a giant rubber duck through outer space with stars and planets in the background',
-  'teaching a yoga class to a group of confused penguins on an iceberg',
-  'conducting a full orchestra made entirely of cats in a grand concert hall',
-  'arm wrestling a sasquatch at a roadside diner while onlookers cheer',
-  'surfing a massive wave on a surfboard shaped like a slice of pizza',
-  'sitting on the Iron Throne from Game of Thrones looking confused',
-  'piloting a tiny biplane doing loops around the Eiffel Tower',
-  'floating in zero gravity inside the International Space Station eating a taco',
-  'standing on top of a T-Rex like a rodeo cowboy in a prehistoric jungle',
-  'competing in a hot dog eating contest against a bear at a county fair',
-  'DJing a massive music festival from behind giant turntables',
-  'leading a team of sled dogs across the frozen tundra during a blizzard',
-  'sitting in a barber chair getting a haircut from an octopus in an underwater salon',
-  'wrestling an alligator in a swamp while wearing a business suit',
-  'doing karaoke on stage at a packed arena with dramatic lighting',
-  'parachuting out of an airplane holding a boombox over a cityscape',
-  'exploring a cave full of glowing crystals with a tiny headlamp',
-  'riding a shopping cart down a massive hill in a parking lot at full speed',
-  'having a tea party with Bigfoot in a fancy English garden',
-  'standing on the moon planting a flag with Earth in the background',
-  'driving a monster truck over a row of crushed cars at a rally',
-  'in a boxing ring facing off against a kangaroo with boxing gloves',
-  'waterskiing behind a speedboat while being chased by dolphins',
-  'sitting at a poker table in Las Vegas playing cards against robots',
-  'climbing the side of a skyscraper like King Kong',
-  'racing go-karts on Rainbow Road from Mario Kart',
-  'herding cats across an open prairie on horseback',
-  'at a tiki bar on a tropical island being served by a parrot bartender',
-  'bungee jumping off a bridge over a massive canyon',
-  'in a sumo wrestling ring facing a much larger opponent',
-  'mud-bogging a jacked-up pickup truck through a massive swampy field with mud flying everywhere',
-  'noodling for a giant catfish with bare hands in a muddy river',
-  'racing a souped-up riding lawnmower against stock cars at a NASCAR track',
-  'deep-frying a whole turkey in the driveway next to a pickup truck up on cinder blocks',
-  'doing a cannonball off the roof of a double-wide trailer into a backyard kiddie pool',
-  'tending a moonshine still deep in the woods with mason jars stacked everywhere',
-  'riding a mechanical bull at a honky-tonk bar with a longneck beer in each hand',
-  'jumping a creek on a four-wheeler and splashing down into the water',
-  'hosting a backyard wrestling tournament on a trampoline with tiki torches lighting up the night',
-  'fishing off the tailgate of a pickup truck parked in a flooded Walmart parking lot',
-  'in a demolition derby smashing a rusted-out sedan into other junkers in a muddy arena',
-  'duct-taping a broken lawn chair back together at a family reunion BBQ surrounded by empty beer cans',
-  'dominating a cornhole championship with pinpoint bean bag tosses while holding a corndog',
-  'holding up a catfish the size of a small car after reeling it in off a rickety fishing boat',
-  'barbecuing a whole hog in a fifty-five gallon drum smoker with smoke pouring out everywhere',
-  'belting out karaoke on top of a honky-tonk bar using a corn dog as a microphone',
-  'chasing a greased pig at a county fair while covered head to toe in mud',
-  'launching a rusted-out pickup truck off a plywood ramp over a creek Dukes-of-Hazzard style',
+  "repairing a towering server rack in a medieval dungeon while tiny dragons warm the blinking equipment",
+  "sitting at a help-desk counter on a cloud, troubleshooting a thunderstorm with an oversized multimeter",
+  "untangling a mountain of Ethernet cables that has arranged itself into a giant knitted sweater",
+  "installing a wireless access point on a giraffe-shaped ladder in an impossibly tall living room",
+  "sternly rebooting a refrigerator-sized computer while its exhaust blows his beard sideways",
+  "using a magnifying glass to investigate a trail of escaped keyboard keys across a dusty office",
+  "standing inside a gigantic desktop computer, replacing a glowing processor with a cast-iron waffle maker",
+  "patiently explaining a printer jam to a flock of pigeons sitting on an office copier",
+  "balancing on a mountain of obsolete monitors, holding a single working mouse like a priceless artifact",
+  "walking through a desert with a satellite dish umbrella that casts a tiny patch of Wi-Fi-shaped shade",
+  "operating a roadside biscuit stand where the biscuits float gently above their baking trays",
+  "wearing a beekeeper veil while inspecting a hive built entirely from miniature pickup truck beds",
+  "trying to fold a fitted sheet the size of a football field in an empty stadium",
+  "assembling flat-pack furniture that has turned into a magnificent wooden drawbridge in his driveway",
+  "standing proudly beside a mailbox converted into a tiny lighthouse that beams across a suburban street",
+  "using a leaf blower to inflate an enormous inflatable sofa on a perfectly ordinary front porch",
+  "carefully pressure-washing a muddy statue of himself in a backyard full of sparkling clean garden gnomes",
+  "building a luxurious treehouse around a single ridiculously short sapling, with an elevator and balcony",
+  "measuring an enormous sandwich with a surveying instrument in the middle of a picnic field",
+  "standing ankle-deep in packing peanuts while unboxing a single teaspoon delivered in a warehouse-sized crate",
+  "commanding a submarine shaped like a mason jar through a reef of glowing soda bottles",
+  "operating a lighthouse whose rotating lamp is a gigantic flaming marshmallow",
+  "guiding a hot-air balloon made from patchwork denim over a valley of enormous sunflowers",
+  "wearing a practical work vest inside a crystal palace while fixing a leaky faucet made of ice",
+  "paddling a bathtub with claw feet across a perfectly still lake at sunrise",
+  "camping inside a colossal hollow pumpkin with a rocking chair and a small wood stove",
+  "navigating a maze of corn stalks using a satellite dish mounted on a wheelbarrow",
+  "exploring a miniature canyon formed between gigantic slices of freshly baked bread",
+  "standing on an enormous floating lily pad, repairing a brass telescope pointed at fireflies",
+  "operating an old-fashioned railway switch that redirects a train of clouds across a pink evening sky",
+  "trying to barbecue one absurdly long asparagus spear stretched across an entire backyard",
+  "carving an elegant ice sculpture of a possum while wearing oven mitts in a walk-in freezer",
+  "making pancakes on a griddle that doubles as an enormous round shield, with syrup splashing in midair",
+  "inspecting a prize-winning watermelon displayed on a forklift in an empty exhibition hall",
+  "rolling a giant wheel of cheese up a gentle country lane using an elaborate pulley system",
+  "sitting inside a transparent vending machine, meticulously restocking shelves with miniature rocking chairs",
+  "repairing a waffle iron that produces perfectly formed golden roof shingles",
+  "presenting a single immaculate deviled egg under a glass dome on a velvet pedestal",
+  "stirring a cauldron of alphabet soup whose letters hover above the pot like confused moths",
+  "using a fishing net to catch popcorn bursting from a cornfield under a dramatic sunset",
+  "operating a moon rover assembled from a lawn chair, wagon wheels, and a polished metal cooler",
+  "wearing a scuba helmet in a room full of floating jellybeans, collecting samples with kitchen tongs",
+  "repairing a leaking spaceship with a toolbox while bolts drift around his unmistakably recognizable face",
+  "standing on a tiny asteroid equipped with a porch swing, checking its satellite internet connection",
+  "piloting a rocket-powered recliner through a tunnel of glowing geometric shapes",
+  "watching an eclipse through an enormous welding mask beside a homemade cardboard observatory",
+  "installing a ceiling fan in a gravity-free workshop while every loose screw floats in formation",
+  "collecting cosmic dust in an old shop vacuum beside a spectacular ringed planet",
+  "operating a control panel made of antique doorbells inside a sleek futuristic spaceport",
+  "walking through a greenhouse on Mars, proudly tending a single gigantic okra plant",
+  "wearing a jeweled crown while inspecting a kingdom made entirely from stacked cinder blocks",
+  "carrying a toolbox through an enchanted forest where mushrooms illuminate his path like work lights",
+  "hammering a tiny horseshoe onto the hoof of a patient mechanical unicorn in a rustic workshop",
+  "repairing the hinge on a gigantic treasure chest while golden butterflies flutter around his head",
+  "standing in a wizard tower, using a level to straighten a crooked floating staircase",
+  "reading an enormous spellbook that has accidentally transformed his boots into flowerpots",
+  "trimming the beard of a moss-covered stone guardian with gigantic hedge clippers",
+  "unlocking an ancient temple door with an ordinary house key on a comically overloaded key ring",
+  "tuning a brass weather machine that produces perfectly square rain clouds over an empty field",
+  "wearing a cape made from a quilt while organizing enchanted tools that hover above his workbench",
+  "sitting in a museum display labeled only with blank plaques, posed like a priceless archaeological discovery",
+  "carefully hanging a portrait of himself inside a gallery where every frame is slightly crooked",
+  "sculpting a masterpiece from mashed potatoes using a masonry trowel in an elegant studio",
+  "performing a dramatic solo on an accordion made from corrugated air-conditioning ductwork",
+  "balancing on a giant paint roller while covering the side of a barn with a rainbow mural",
+  "posing for a grand marble monument while holding a cordless drill and wearing muddy work boots",
+  "restoring an antique chandelier constructed entirely from polished socket wrenches",
+  "creating a sand sculpture of an elaborate server room on an otherwise empty beach",
+  "arranging garden hoses into an intricate geometric masterpiece on a freshly mowed lawn",
+  "making a delicate origami swan from a tarp the size of a warehouse floor",
+  "serving as the sole referee at a championship match between two remote-controlled vacuum cleaners",
+  "curling an enormous polished bowling ball across a frozen farm pond toward brightly colored milk cans",
+  "practicing a golf swing with a shovel on a miniature course built inside a greenhouse",
+  "standing on a winners podium after a competition to stack the tallest tower of empty coolers",
+  "performing a flawless balance-beam routine on a suspended wooden fence rail above a padded gym floor",
+  "playing table tennis against a robotic leaf blower in a brightly lit garage",
+  "lifting a barbell made from two enormous pumpkins while seated on a hay bale",
+  "racing a pedal-powered armchair around a velodrome with his beard streaming backward",
+  "training for a javelin event using a pool noodle in a windswept open field",
+  "preparing to pole-vault over a low picket fence with a ridiculously long bamboo cane",
+  "trying to check into an elegant hotel with luggage consisting entirely of nested plastic buckets",
+  "standing on a baggage carousel while his lone suitcase circles him on a miniature conveyor belt",
+  "photographing a mountain vista with a camera built from an oversized cardboard box",
+  "wearing a bathrobe aboard a luxurious train whose interior is entirely upholstered in camouflage fabric",
+  "waiting at a bus shelter shaped like a giant boot during a gentle rain of colorful feathers",
+  "unfolding a road map so enormous it covers the whole hood of a parked tractor",
+  "steering a narrowboat through a canal lined with towering shelves of antique tools",
+  "checking the oil in a steam-powered automobile in front of a magnificent clockwork city",
+  "driving a street-sweeper-sized bumper car through a deserted amusement arcade",
+  "navigating a staircase of floating suitcases with a modest travel mug in one hand",
+  "negotiating with a raccoon perched on his toolbox for the return of a shiny socket wrench",
+  "patiently giving a tortoise a tune-up at a garage workbench outfitted with miniature ramps",
+  "standing beside a gigantic snail fitted with a solar panel and a comfortable little porch",
+  "training a flock of origami cranes to carry tiny hardware-store bags through his workshop",
+  "inspecting a squirrel-operated conveyor belt that delivers acorns into an immaculate filing cabinet",
+  "wearing rain boots while persuading a stubborn flamingo to step off a freshly painted deck",
+  "sharing his porch with a dignified capybara that has taken over the best rocking chair",
+  "using a stethoscope to diagnose a mechanical rooster whose alarm bell is stuck open",
+  "measuring a very tall ostrich for a custom-made raincoat in a rustic sewing workshop",
+  "standing proudly behind a lemon-powered generator while a row of tiny desk fans blows his beard upward",
 ];
 
 const STYLES = [
@@ -82,43 +134,16 @@ const STYLES = [
   'ukiyo-e Japanese woodblock print style',
 ];
 
-const HOLIDAYS = [
-  { month: 1, day: 1, name: "New Year's Day", scene: "celebrating New Year's at a wild party with confetti, champagne, and fireworks at midnight" },
-  { month: 2, day: 2, name: 'Groundhog Day', scene: 'dressed as a groundhog popping out of a hole looking for his shadow' },
-  { month: 2, day: 14, name: "Valentine's Day", scene: "surrounded by giant hearts and cupid arrows, holding a comically oversized box of chocolates" },
-  { month: 3, day: 17, name: "St. Patrick's Day", scene: 'at the end of a rainbow fighting a leprechaun for a pot of gold' },
-  { month: 4, day: 1, name: "April Fools' Day", scene: 'setting up an elaborate prank with buckets of slime and whoopee cushions everywhere' },
-  { month: 5, day: 5, name: 'Cinco de Mayo', scene: 'at a huge fiesta with a mariachi band, wearing a giant sombrero' },
-  { month: 5, day: 26, name: 'Memorial Day', scene: 'at a massive backyard BBQ cookout grilling burgers with American flags everywhere' },
-  { month: 7, day: 4, name: 'Independence Day', scene: 'lighting a comically large firework with a huge American flag cape flowing behind him' },
-  { month: 9, day: 1, name: 'Labor Day', scene: 'lounging in a hammock between two palm trees refusing to do any work' },
-  { month: 10, day: 31, name: 'Halloween', scene: 'in a haunted house surrounded by ghosts and jack-o-lanterns wearing a ridiculous costume' },
-  { month: 11, day: 27, name: 'Thanksgiving', scene: 'at a Thanksgiving dinner table arm wrestling a giant turkey' },
-  { month: 12, day: 25, name: 'Christmas', scene: "stuck in a chimney dressed as Santa with reindeer on the roof looking down at him" },
-  { month: 12, day: 31, name: "New Year's Eve", scene: 'at a rooftop New Year\'s Eve party with the ball dropping in Times Square behind him' },
-];
-
-function getHolidayScene(month, day) {
-  for (const h of HOLIDAYS) {
-    const diff = (month === h.month) ? Math.abs(day - h.day) : -1;
-    if (diff >= 0 && diff <= 2) {
-      return { name: h.name, scene: h.scene };
-    }
-  }
-  return null;
-}
-
 function getDailyConfig(date) {
   const dayOfYear = Math.floor((date - new Date(date.getFullYear(), 0, 0)) / 86400000);
   const sourceIndex = ANDY_SOURCE_INDICES[dayOfYear % ANDY_SOURCE_INDICES.length];
   const sceneIndex = dayOfYear % SCENES.length;
   const styleIndex = dayOfYear % STYLES.length;
-  const holiday = getHolidayScene(date.getMonth() + 1, date.getDate());
   return {
     sourceIndex,
-    scene: holiday ? holiday.scene : SCENES[sceneIndex],
+    scene: SCENES[sceneIndex],
     style: STYLES[styleIndex],
-    holidayName: holiday ? holiday.name : null,
+    holidayName: null,
   };
 }
 
@@ -126,13 +151,11 @@ function getRandomConfig() {
   const sourceIndex = ANDY_SOURCE_INDICES[Math.floor(Math.random() * ANDY_SOURCE_INDICES.length)];
   const scene = SCENES[Math.floor(Math.random() * SCENES.length)];
   const style = STYLES[Math.floor(Math.random() * STYLES.length)];
-  const now = new Date();
-  const holiday = getHolidayScene(now.getMonth() + 1, now.getDate());
   return {
     sourceIndex,
-    scene: holiday ? holiday.scene : scene,
+    scene,
     style,
-    holidayName: holiday ? holiday.name : null,
+    holidayName: null,
   };
 }
 
