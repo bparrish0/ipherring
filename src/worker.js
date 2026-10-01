@@ -7,6 +7,12 @@ const SOURCE_IMAGES = [
   { key: 'source/6.jpeg', people: 1, subject: 'evan' },
 ];
 
+// Defaults use solo Andy references; Evan and duo photos remain for custom requests.
+const ANDY_SOURCE_INDICES = SOURCE_IMAGES
+  .map((source, index) => ({ source, index }))
+  .filter(({ source }) => source.people === 1 && source.subject !== 'evan')
+  .map(({ index }) => index);
+
 const SCENES = [
   'riding a giant rubber duck through outer space with stars and planets in the background',
   'teaching a yoga class to a group of confused penguins on an iceberg',
@@ -104,7 +110,7 @@ function getHolidayScene(month, day) {
 
 function getDailyConfig(date) {
   const dayOfYear = Math.floor((date - new Date(date.getFullYear(), 0, 0)) / 86400000);
-  const sourceIndex = dayOfYear % SOURCE_IMAGES.length;
+  const sourceIndex = ANDY_SOURCE_INDICES[dayOfYear % ANDY_SOURCE_INDICES.length];
   const sceneIndex = dayOfYear % SCENES.length;
   const styleIndex = dayOfYear % STYLES.length;
   const holiday = getHolidayScene(date.getMonth() + 1, date.getDate());
@@ -117,7 +123,7 @@ function getDailyConfig(date) {
 }
 
 function getRandomConfig() {
-  const sourceIndex = Math.floor(Math.random() * SOURCE_IMAGES.length);
+  const sourceIndex = ANDY_SOURCE_INDICES[Math.floor(Math.random() * ANDY_SOURCE_INDICES.length)];
   const scene = SCENES[Math.floor(Math.random() * SCENES.length)];
   const style = STYLES[Math.floor(Math.random() * STYLES.length)];
   const now = new Date();
@@ -139,7 +145,7 @@ function buildPrompt(scene, style, holidayName, source) {
   } else if (source.subject === 'evan') {
     intro = 'This photo shows Evan, a man with a red beard, glasses, and a maroon zip jacket.';
   } else {
-    intro = 'This photo shows a man named Andy.';
+    intro = 'This photo shows a man named Andy. Feature only Andy as the main subject; do not add a second featured person.';
   }
 
   let prompt = `${intro} Extract the people/person from this photo preserving their faces, beards, glasses, hair, build, and general clothing style. `;
@@ -179,13 +185,12 @@ async function generateImage(env, config, context = {}) {
   console.log(`Generating - Source: ${source.key} (${source.people} people), Prompt: "${prompt.substring(0, 200)}"`);
 
   const formData = new FormData();
-  formData.append('model', 'gpt-image-1.5');
+  formData.append('model', 'gpt-image-2.5-sunburst');
   formData.append('image[]', sourceBlob, 'source.png');
   formData.append('prompt', prompt);
   formData.append('n', '1');
   formData.append('size', '1024x1024');
   formData.append('quality', 'high');
-  formData.append('input_fidelity', 'high');
   formData.append('output_format', 'webp');
   formData.append('output_compression', '80');
 
